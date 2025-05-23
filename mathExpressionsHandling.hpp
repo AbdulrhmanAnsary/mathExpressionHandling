@@ -30,15 +30,6 @@ public:
 class ExpressionParser : public IExpressionHandling {
 public:
   OperatorsHandling opHandling;
-  virtual void handleExponentiation(std::string::const_iterator &it,
-                                    const std::string &expression,
-                                    std::string &op) const {
-    if (*it == '*' && std::next(it) != expression.end() &&
-        *std::next(it) == '*') {
-      op = "**";
-      it = std::next(it);
-    }
-  }
 };
 
 class IExpressionConverter : public ExpressionParser {

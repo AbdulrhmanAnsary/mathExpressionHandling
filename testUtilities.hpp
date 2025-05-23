@@ -1,6 +1,11 @@
-#include <chrono>
-#include <iostream>
+#ifndef TEST_UTILITIES_HPP
+#define TEST_UTILITIES_HPP
+
 #include <vector>
+#include <string>
+#include <iostream>
+#include <chrono> // Required for std::chrono
+#include <functional> // Required for std::function (though not directly used by this version of runTests)
 
 // Function: runTests
 // Purpose: Tests an IExpressionsHandling methods against multiple test cases.
@@ -50,10 +55,11 @@ void runTests(const std::vector<T> &testCases,
                    "====]\n";
       std::cout << "  Test " << i + 1 << ": false because:\n" << std::endl;
       std::cout << "    Expected: " << testCasesExpected[i] << std::endl;
-      std::cout << "    Length: " << size(testCasesExpected[i]) << std::endl
+      // Using .length() for std::string, size() is more generic for containers
+      std::cout << "    Length: " << testCasesExpected[i].length() << std::endl
                 << std::endl;
       std::cout << "    Actual: " << result << std::endl;
-      std::cout << "    Length: " << size(result) << std::endl << std::endl;
+      std::cout << "    Length: " << result.length() << std::endl << std::endl;
       std::cout << "    The test run in (" << testTime << ") ms" << std::endl;
       std::cout
           << "[============================================================]\n";
@@ -84,3 +90,56 @@ void runTests(const std::vector<T> &testCases,
 
   std::cout << "\033[97m"; // Reset the console output color to white (default)
 }
+
+// Template function to run tests for numerical results (double)
+template <typename className>
+void runTestsNumerical(const std::vector<std::string> &testCases,
+                       const std::vector<double> &testCasesExpected,
+                       const className *object,
+                       double (className::*method)(const std::string &) const,
+                       double epsilon = 1e-9) { // Epsilon for double comparison
+  int successCounter = 0;
+  int failCounter = 0;
+  double totalTestTime = 0.0;
+  for (size_t i = 0; i < testCases.size(); ++i) {
+    auto startTime = std::chrono::steady_clock::now();
+    double result = (object->*method)(testCases[i]);
+    auto endTime = std::chrono::steady_clock::now();
+    double testTime =
+        std::chrono::duration<double, std::milli>(endTime - startTime).count();
+    totalTestTime += testTime;
+
+    // Compare doubles with tolerance
+    if (std::abs(result - testCasesExpected[i]) < epsilon) {
+      std::cout << "\033[32m"; // Green for success
+      std::cout << "\nTest " << i + 1 << " (Input: \"" << testCases[i] << "\"): passed in (" << testTime
+                << ") ms\n";
+      successCounter++;
+    } else {
+      std::cout << "\033[31m"; // Red for fail
+      std::cout << "\n[========================================================"
+                   "====]\n";
+      std::cout << "  Test " << i + 1 << " (Input: \"" << testCases[i] << "\"): false because:\n" << std::endl;
+      std::cout << "    Expected: " << testCasesExpected[i] << std::endl;
+      std::cout << "    Actual:   " << result << std::endl;
+      std::cout << "    The test run in (" << testTime << ") ms" << std::endl;
+      std::cout
+          << "[============================================================]\n";
+      failCounter++;
+    }
+  }
+
+  failCounter != 0 ? std::cout << "\033[31m" << std::endl
+                   : std::cout << "\033[32m" << std::endl;
+  std::cout << "Total time: (" << totalTestTime << ") ms\n\n";
+  std::cout << "\033[32m[  PASSED  ] " << successCounter << " tests\n";
+  std::cout << "\033[31m";
+  failCounter != 0 ? std::cout << "[  FAILED  ] " << failCounter << " tests\n"
+                   : std::cout << "";
+  failCounter != 0 ? std::cout << "\033[31m" : std::cout << "\033[32m";
+  std::cout << "\npassed " << successCounter << " from " << testCases.size()
+            << " tests\n";
+  std::cout << "\033[97m"; // Reset color
+}
+
+#endif // TEST_UTILITIES_HPP

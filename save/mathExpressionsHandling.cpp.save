@@ -1,0 +1,260 @@
+#include "mathExpressionsHandling.hpp"
+#include <algorithm>
+#include <cctype>
+#include <stack>
+#include <stdexcept>
+#include <vector>
+
+static std::vector<std::string> tokenize(const std::string &expr) {
+  std::vector<std::string> tokens;
+  for (size_t i = 0; i < expr.size();) {
+    if (std::isspace((unsigned char)expr[i])) {
+      ++i;
+      continue;
+    }
+    if (std::isdigit((unsigned char)expr[i])) {
+      size_t j = i;
+      while (j < expr.size() && std::isdigit((unsigned char)expr[j]))
+        ++j;
+      tokens.emplace_back(expr.substr(i, j - i));
+      i = j;
+    } else {
+      if (expr[i] == '*' && i + 1 < expr.size() && expr[i + 1] == '*') {
+        tokens.emplace_back("**");
+        i += 2;
+      } else {
+        tokens.emplace_back(std::string(1, expr[i]));
+        ++i;
+      }
+    }
+  }
+  return tokens;
+}
+
+static std::string join(const std::vector<std::string> &tokens) {
+  std::string out;
+  for (size_t i = 0; i < tokens.size(); ++i) {
+    out += tokens[i];
+    if (i + 1 < tokens.size())
+      out += ' ';
+  }
+  return out;
+}
+
+template <typename T> bool isNum(const T &expression) {
+  return !expression.empty() &&
+         std::all_of(expression.begin(), expression.end(),
+                     [](char c) { return std::isdigit((unsigned char)c); });
+}
+template bool isNumstd::string(const std::string &);
+
+static int prec(const std::string &op) {
+  if (op == "+" || op == "-")
+    return 1;
+  if (op == "*" || op == "/")
+    return 2;
+  if (op == "^" || op == "**")
+    return 3;
+  return 0;
+}
+
+std::string ExpressionConverter::infixToPostfix(const std::string &e) const {
+  auto t = tokenize(e);
+  std::vectorstd::string o;
+  std::stackstd::string s;
+  for (auto &tk : t) {
+    if (isNum(tk))
+      o.push_back(tk);
+    else if (tk == "(")
+      s.push(tk);
+    else if (tk == ")") {
+      while (!s.empty() && s.top() != "(") {
+        o.push_back(s.top());
+        s.pop();
+      }
+      if (!s.empty())
+        s.pop();
+    } else {
+      while (!s.empty() && prec(s.top()) >= prec(tk)) {
+        o.push_back(s.top());
+        s.pop();
+      }
+      s.push(tk);
+    }
+  }
+  while (!s.empty()) {
+    o.push_back(s.top());
+    s.pop();
+  }
+  return join(o);
+}
+
+std::string ExpressionConverter::infixToPrefix(const std::string &e) const {
+  auto t = tokenize(e);
+  std::reverse(t.begin(), t.end());
+  for (auto &tk : t)
+    if (tk == "(")
+      tk = ")";
+    else if (tk == ")")
+      tk = "(";
+  auto p = infixToPostfix(join(t));
+  auto pt = tokenize(p);
+  std::reverse(pt.begin(), pt.end());
+  return join(pt);
+}
+
+std::string ExpressionConverter::postfixToPrefix(const std::string &e) const {
+  auto t = tokenize(e);
+  std::stack<std::vectorstd::string> st;
+  for (auto &tk : t) {
+    if (isNum(tk))
+      st.push({tk});
+    else {
+      if (st.size() < 2)
+        throw std::runtime_error("Invalid");
+      auto b = st.top();
+      st.pop();
+      auto a = st.top();
+      st.pop();
+      std::vectorstd::string c = {tk};
+      c.insert(c.end(), a.begin(), a.end());
+      c.insert(c.end(), b.begin(), b.end());
+      st.push(c);
+    }
+  }
+  return join(st.top());
+}
+
+std::string ExpressionConverter::prefixToPostfix(const std::string &e) const {
+  auto t = tokenize(e);
+  std::stack<std::vectorstd::string> st;
+  for (int i = (int)t.size() - 1; i >= 0; --i) {
+    auto &tk = t[i];
+    if (isNum(tk))
+      st.push({tk});
+    else {
+      if (st.size() < 2)
+        throw std::runtime_error("Invalid");
+      auto a = st.top();
+      st.pop();
+      auto b = st.top();
+      st.pop();
+      std::vectorstd::string c = a;
+      c.insert(c.end(), b.begin(), b.end());
+      c.push_back(tk);
+      st.push(c);
+    }
+  }
+  return join(st.top());
+}
+
+std::string ExpressionConverter::postfixToInfix(const std::string &e) const {
+  auto t = tokenize(e);
+  std::stack<std::vectorstd::string> st;
+  for (auto &tk : t) {
+    if (isNum(tk))
+      st.push({tk});
+    else {
+      if (st.size() < 2)
+        throw std::runtime_error("Invalid");
+      auto b = st.top();
+      st.pop();
+      auto a = st.top();
+      st.pop();
+      std::vectorstd::string c = {"("};
+      c.insert(c.end(), a.begin(), a.end());
+      c.push_back(tk);
+      c.insert(c.end(), b.begin(), b.end());
+      c.push_back(")");
+      st.push(c);
+    }
+  }
+  return join(st.top());
+}
+
+std::string ExpressionConverter::prefixToInfix(const std::string &e) const {
+  auto t = tokenize(e);
+  std::stack<std::vectorstd::string> st;
+  for (int i = (int)t.size() - 1; i >= 0; --i) {
+    auto &tk = t[i];
+    if (isNum(tk))
+      st.push({tk});
+    else {
+      if (st.size() < 2)
+        throw std::runtime_error("Invalid");
+      auto a = st.top();
+      st.pop();
+      auto b = st.top();
+      st.pop();
+      std::vectorstd::string c = {"("};
+      c.insert(c.end(), a.begin(), a.end());
+      c.push_back(tk);
+      c.insert(c.end(), b.begin(), b.end());
+      c.push_back(")");
+      st.push(c);
+    }
+  }
+  return join(st.top());
+}
+
+int ExpressionEvaluator::calcPostfix(const std::string &e) const {
+  auto t = tokenize(e);
+  std::stack<int> st;
+  for (auto &tk : t) {
+    if (isNum(tk))
+      st.push(std::stoi(tk));
+    else {
+      if (st.size() < 2)
+        throw std::runtime_error("Invalid");
+      int b = st.top();
+      st.pop();
+      int a = st.top();
+      st.pop();
+      if (tk == "+")
+        st.push(a + b);
+      else if (tk == "-")
+        st.push(a - b);
+      else if (tk == "")
+        st.push(ab);
+      else if (tk == "/")
+        st.push(a / b);
+      else if (tk == "^" || tk == "**")
+        st.push((int)std::pow(a, b));
+    }
+  }
+  return st.top();
+}
+
+int ExpressionEvaluator::calcPrefix(const std::string &e) const {
+  auto t = tokenize(e);
+  std::stack<int> st;
+  for (int i = (int)t.size() - 1; i >= 0; --i) {
+    auto &tk = t[i];
+    if (isNum(tk))
+      st.push(std::stoi(tk));
+    else {
+      if (st.size() < 2)
+        throw std::runtime_error("Invalid");
+      int a = st.top();
+      st.pop();
+      int b = st.top();
+      st.pop();
+      if (tk == "+")
+        st.push(a + b);
+      else if (tk == "-")
+        st.push(a - b);
+      else if (tk == "")
+        st.push(ab);
+      else if (tk == "/")
+        st.push(a / b);
+      else if (tk == "^" || tk == "**")
+        st.push((int)std::pow(a, b));
+    }
+  }
+  return st.top();
+}
+
+int ExpressionEvaluator::calcInfix(const std::string &e) const {
+  ExpressionConverter c;
+  return calcPostfix(c.infixToPostfix(e));
+}

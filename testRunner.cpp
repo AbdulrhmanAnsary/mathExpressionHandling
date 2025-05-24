@@ -91,23 +91,63 @@ int main() {
   // --- Test Data: Floating Point ---
   std::vector<std::string> infix_expressions_floating_point = {
       "10/4", "7/2", "1/3+1/3+1/3", "5.5+2.2", "3.0*2.5", "10.0/4.0 - 0.5",
-      "100 / ( 2.5 * 8 )" // 100 / 20 = 5
+      "100 / ( 2.5 * 8 )", // 100 / 20 = 5
+      // New valid test cases
+      "0.5 + 0.25",
+      "10. * .5",
+      ".25 - .125",
+      "100.0 / 2.0",
+      "3.14 * (2.0 + 1.0)",
+      "1. + 2",
+      "3. - .5"
   };
   std::vector<std::string> prefix_expected_floating_point = {
       "/ 10 4", "/ 7 2", "+ + / 1 3 / 1 3 / 1 3", "+ 5.5 2.2", "* 3.0 2.5", "- / 10.0 4.0 0.5",
-      "/ 100 * 2.5 8"
+      "/ 100 * 2.5 8",
+      // New prefix expected
+      "+ 0.5 0.25",
+      "* 10. .5",
+      "- .25 .125",
+      "/ 100.0 2.0",
+      "* 3.14 + 2.0 1.0",
+      "+ 1. 2",
+      "- 3. .5"
   };
   std::vector<std::string> postfix_expected_floating_point = {
       "10 4 /", "7 2 /", "1 3 / 1 3 / + 1 3 / +", "5.5 2.2 +", "3.0 2.5 *", "10.0 4.0 / 0.5 -",
-      "100 2.5 8 * /"
+      "100 2.5 8 * /",
+      // New postfix expected
+      "0.5 0.25 +",
+      "10. .5 *",
+      ".25 .125 -",
+      "100.0 2.0 /",
+      "3.14 2.0 1.0 + *",
+      "1. 2 +",
+      "3. .5 -"
   };
   std::vector<double> eval_expected_floating_point = {
       2.5, 3.5, 1.0, 7.7, 7.5, 2.0,
-      5.0
+      5.0,
+      // New eval expected
+      0.75,
+      5.0,
+      0.125,
+      50.0,
+      9.42, // 3.14 * 3.0
+      3.0,
+      2.5
   };
   std::vector<std::string> infix_expected_floating_point_canonical = {
       "( 10 / 4 )", "( 7 / 2 )", "( ( ( 1 / 3 ) + ( 1 / 3 ) ) + ( 1 / 3 ) )", "( 5.5 + 2.2 )", "( 3.0 * 2.5 )", "( ( 10.0 / 4.0 ) - 0.5 )",
-      "( 100 / ( 2.5 * 8 ) )"
+      "( 100 / ( 2.5 * 8 ) )",
+      // New canonical infix
+      "( 0.5 + 0.25 )",
+      "( 10. * .5 )",
+      "( .25 - .125 )",
+      "( 100.0 / 2.0 )",
+      "( 3.14 * ( 2.0 + 1.0 ) )",
+      "( 1. + 2 )",
+      "( 3. - .5 )"
   };
 
 
@@ -199,6 +239,77 @@ int main() {
   std::cout << "\n[--- Testing calcPrefix (floating point) ---]\n";
   runTestsNumerical(prefix_expected_floating_point, eval_expected_floating_point, &evaluator, &ExpressionEvaluator::calcPrefix);
 
+  // --- Running Malformed Input Tests ---
+  std::cout << "\n[========== Running Malformed Input Tests ==========]\n";
+  int malformedSuccessCounter = 0;
+  int malformedFailCounter = 0;
+  // Based on the current implementation, the most common error for these will be due to "." being an unknown token
+  // after tokenization, because isNum(".") is false.
+  std::string expectedErrorSubstringGeneric = "Unknown token '.'"; 
+
+  auto testMalformedExpression = 
+    [&](const std::string& exprStr, const std::string& expectedSubstr, const std::string& testName) {
+    std::cout << "\n--- Testing Malformed: " << testName << " (\"" << exprStr << "\") ---" << std::endl;
+    bool testPassed = false;
+    try {
+        // We test infixToPostfix as it's the first stage that uses tokenize and isNum extensively.
+        convertExpr.infixToPostfix(exprStr);
+        std::cerr << "\033[31mTest FAILED: Expected std::runtime_error for '" << exprStr << "' but none was thrown.\033[97m" << std::endl;
+        malformedFailCounter++;
+    } catch (const std::runtime_error& e) {
+        std::string errorMsg = e.what();
+        if (errorMsg.find(expectedSubstr) != std::string::npos) {
+            std::cout << "\033[32mTest PASSED: Correctly threw for '" << exprStr << "'. Error: " << errorMsg << "\033[97m" << std::endl;
+            malformedSuccessCounter++;
+            testPassed = true;
+        } else {
+            std::cerr << "\033[31mTest FAILED: Incorrect error for '" << exprStr 
+                      << "'.\n    Expected substring: \"" << expectedSubstr 
+                      << "\"\n    Got error: \"" << errorMsg << "\"\033[97m" << std::endl;
+            malformedFailCounter++;
+        }
+    } catch (...) {
+        std::cerr << "\033[31mTest FAILED: Expected std::runtime_error for '" << exprStr << "' but a different exception was thrown.\033[97m" << std::endl;
+        malformedFailCounter++;
+    }
+    return testPassed;
+  };
+
+  // Test cases for malformed inputs
+  // For "3.1.4 + 5", tokenizer creates "3.1", ".", "4", "+", "5". The "." token is rejected by isNum.
+  testMalformedExpression("3.1.4 + 5", expectedErrorSubstringGeneric, "Multiple decimals in number (3.1.4)");
+  // For "1..2 - 3", tokenizer creates "1.", ".", "2", "-", "3". The second "." token is rejected.
+  testMalformedExpression("1..2 - 3", expectedErrorSubstringGeneric, "Consecutive decimals (1..2)");
+  // For "1.2. + 3", tokenizer creates "1.2", ".", "+", "3". The "." token is rejected.
+  testMalformedExpression("1.2. + 3", expectedErrorSubstringGeneric, "Multiple decimals with operator (1.2.)");
+  testMalformedExpression("( . + 1 )", expectedErrorSubstringGeneric, "Lone dot in parentheses");
+  testMalformedExpression(". + 1", expectedErrorSubstringGeneric, "Lone dot at start of expression");
+  testMalformedExpression("1 + .", expectedErrorSubstringGeneric, "Lone dot at end of expression");
+  // For "1..", tokenizer creates "1.", ".", The second "." token is rejected.
+  testMalformedExpression("1..", expectedErrorSubstringGeneric, "Number ending with multiple dots (1..)");
+  // For "..1", tokenizer creates ".", ".", "1". The first "." token is rejected.
+  testMalformedExpression("..1", expectedErrorSubstringGeneric, "Number starting with multiple dots (..1)");
+  // For "1 . 2", tokenizer creates "1", ".", "2". The "." token is rejected.
+  testMalformedExpression("1 . 2", expectedErrorSubstringGeneric, "Space separated dot (1 . 2)");
+
+
+  std::cout << "\n[--- Malformed Input Test Summary ---]\n";
+  if (malformedFailCounter > 0) {
+      std::cout << "\033[31m"; // Red for summary if failures
+      std::cout << "[  SOME MALFORMED TESTS FAILED  ]\n";
+  } else {
+      std::cout << "\033[32m"; // Green for summary if all pass
+      std::cout << "[  ALL MALFORMED TESTS PASSED  ]\n";
+  }
+  std::cout << "Passed " << malformedSuccessCounter << " from " 
+            << (malformedSuccessCounter + malformedFailCounter) << " malformed input tests.\033[97m\n"; // Reset color
+
   std::cout << "\n[========== All Tests Completed ==========]\n";
+  // Check existing test failures (need to adapt if getTotalFailedTests() isn't available)
+  // For now, just consider malformedFailCounter for return status
+  if (malformedFailCounter > 0) { 
+      std::cerr << "\n\033[31mOverall: Some malformed input tests failed.\033[97m" << std::endl;
+      return 1; // Indicate failure
+  }
   return 0;
 }

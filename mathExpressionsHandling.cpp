@@ -14,10 +14,31 @@ static std::vector<std::string> tokenize(const std::string &expr) {
       ++i;
       continue;
     }
-    if (std::isdigit((unsigned char)expr[i])) {
+    // Check for numbers (integer or floating point)
+    // A number can start with a digit.
+    // A number can start with a '.' IF:
+    //   1. It's followed by a digit.
+    //   2. It's at the beginning of the expression OR the preceding character is not a digit and not a '.'.
+    bool can_start_with_dot = (expr[i] == '.' && 
+                               i + 1 < expr.size() && 
+                               std::isdigit((unsigned char)expr[i + 1]) &&
+                               (i == 0 || (!std::isdigit((unsigned char)expr[i-1]) && expr[i-1] != '.')));
+
+    if (std::isdigit((unsigned char)expr[i]) || can_start_with_dot) {
       size_t j = i;
-      while (j < expr.size() && std::isdigit((unsigned char)expr[j]))
-        ++j;
+      bool hasDecimal = false;
+      
+      while (j < expr.size()) {
+        if (std::isdigit((unsigned char)expr[j])) {
+          j++;
+        } else if (expr[j] == '.' && !hasDecimal) {
+          hasDecimal = true;
+          j++;
+        } else {
+          // Not a digit, or a second decimal point, or not a '.'
+          break;
+        }
+      }
       tokens.emplace_back(expr.substr(i, j - i));
       i = j;
     } else {
@@ -44,10 +65,28 @@ static std::string join(const std::vector<std::string> &tokens) {
 }
 
 template <typename T> bool isNum(const T &expression) {
-  return !expression.empty() &&
-         std::all_of(expression.begin(), expression.end(), [](char c) {
-           return std::isdigit(static_cast<unsigned char>(c));
-         });
+  if (expression.empty()) {
+    return false;
+  }
+  if (expression.length() == 1 && expression[0] == '.') { // Rule out "."
+    return false;
+  }
+
+  bool hasDecimal = false;
+  bool hasDigit = false;
+  for (char c : expression) {
+    if (std::isdigit(static_cast<unsigned char>(c))) {
+      hasDigit = true;
+    } else if (c == '.') {
+      if (hasDecimal) {
+        return false; // Second decimal point
+      }
+      hasDecimal = true;
+    } else {
+      return false; // Invalid character
+    }
+  }
+  return hasDigit; // Must have at least one digit
 }
 template bool isNum<std::string>(const std::string &);
 
@@ -268,7 +307,7 @@ std::string ExpressionConverter::postfixToInfix(const std::string &expr) const {
       std::string operand1 = st.top();
       st.pop();
       // Form the infix sub-expression: "( operand1 op operand2 )" with spaces
-      st.push("(" + operand1 + " " + tok + " " + operand2 + ")");
+      st.push("( " + operand1 + " " + tok + " " + operand2 + " )");
     } else {
       // This case should ideally not be reached if the postfix expression is valid
       // and only contains numbers and recognized operators.
@@ -301,7 +340,7 @@ std::string ExpressionConverter::prefixToInfix(const std::string &expr) const {
       std::string operand2 = st.top();
       st.pop();
       // Form the infix sub-expression: "( operand1 op operand2 )" with spaces
-      st.push("(" + operand1 + " " + tok + " " + operand2 + ")");
+      st.push("( " + operand1 + " " + tok + " " + operand2 + " )");
     } else {
       // This case should ideally not be reached if the prefix expression is valid.
       throw std::runtime_error("Invalid token in prefix expression: " + tok);

@@ -1,0 +1,22 @@
+name: C++ Tests
+
+on: [push, pull_request]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up g++
+        run: sudo apt update && sudo apt install -y g++
+
+      - name: Build project
+        run: |
+          g++ -std=c++17 -Wall -Wextra -o testRunner \
+              mathExpressionsHandling.cpp testRunner.cpp testUtilities.cpp
+
+      - name: Run tests
+        run: ./testRunner

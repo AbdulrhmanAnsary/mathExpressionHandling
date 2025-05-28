@@ -26,3 +26,8 @@ The MVP focuses on providing core functionality for converting and evaluating ma
   - Convert **postfix to prefix**
 - **Improve error handling:** Further refine detection and reporting for a wider range of invalid expressions.
 - **Optimize performance:** Enhance efficiency for large expressions.
+
+## How to run the tests
+```bash
+clang++ testRunner.cpp mathExpressionsHandling.cpp -o testRunner
+```
